@@ -1,25 +1,24 @@
 import torch
-from torch import Tensor
 import torch.nn as nn
-import torch.nn.functional as F
+from torch import Tensor
 
 class RNNCell(nn.Module):
     def __init__(self, input_size:int, hidden_size:int):
         super(RNNCell, self).__init__()
 
-        self.WI = nn.Parameter(torch.empty((input_size, hidden_size)))
-        self.BI = nn.Parameter(torch.empty(hidden_size))
-        self.WH = nn.Parameter(torch.empty((hidden_size, hidden_size)))
-        self.BH = nn.Parameter(torch.empty(hidden_size))
+        self.W_i = nn.Parameter(torch.empty((input_size, hidden_size)))
+        self.b_i = nn.Parameter(torch.empty(hidden_size))
+        self.W_h = nn.Parameter(torch.empty((hidden_size, hidden_size)))
+        self.b_h = nn.Parameter(torch.empty(hidden_size))
 
         self.init_params()
 
     def init_params(self):
-        nn.init.xavier_normal_(self.WI), nn.init.zeros_(self.BI)
-        nn.init.xavier_normal_(self.WH), nn.init.zeros_(self.BH)
+        nn.init.xavier_normal_(self.W_i), nn.init.zeros_(self.b_i)
+        nn.init.xavier_normal_(self.W_h), nn.init.zeros_(self.b_h)
 
     def forward(self, x:Tensor, h:Tensor)->Tensor:
-        return torch.tanh(x @ self.WI + self.BI + h @ self.WH + self.BH)
+        return torch.tanh(x @ self.W_i + self.b_i + h @ self.W_h + self.b_h)
 
 
 class RNN(nn.Module):
@@ -36,7 +35,7 @@ class RNN(nn.Module):
 
         h_t = [h.clone() for h in h_0]
 
-        output = []
+        output = [] 
         for t in range(L):
             for i, cell in enumerate(self.rnn_cells):
                 h_t[i] = cell(x[:, t] if i==0 else h_t[i - 1], h_t[i]) # stacked layers receive the output of the previous layer
@@ -61,17 +60,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     rnn = RNN(args.input_size, args.hidden_size, args.n_layers)
-    torch_rnn = nn.RNN(args.input_size,  args.hidden_size, args.n_layers, nonlinearity="tanh", batch_first=True)
+    rnn_torch = nn.RNN(args.input_size,  args.hidden_size, args.n_layers, nonlinearity="tanh", batch_first=True)
 
     for i, cell in enumerate(rnn.rnn_cells):
-        getattr(torch_rnn, "weight_ih_l" + str(i)).data.copy_(cell.WI.data.T)
-        getattr(torch_rnn, "weight_hh_l" + str(i)).data.copy_(cell.WH.data.T)
-        getattr(torch_rnn, "bias_ih_l" + str(i)).data.copy_(cell.BI.data)
-        getattr(torch_rnn, "bias_hh_l" + str(i)).data.copy_(cell.BH.data)
+        getattr(rnn_torch, "weight_ih_l" + str(i)).data.copy_(cell.W_i.data.T)
+        getattr(rnn_torch, "weight_hh_l" + str(i)).data.copy_(cell.W_h.data.T)
+        getattr(rnn_torch, "bias_ih_l" + str(i)).data.copy_(cell.b_i.data)
+        getattr(rnn_torch, "bias_hh_l" + str(i)).data.copy_(cell.b_h.data)
 
     x = torch.randn(args.batch_size, args.seq_len, args.input_size)  # Batch size of 5, sequence length of 3, feature size of 10
     out, h = rnn(x)
-    out_torch, h_torch = torch_rnn(x)
+    out_torch, h_torch = rnn_torch(x)
 
     np.testing.assert_allclose(out.detach().numpy(), out_torch.detach().numpy(), atol=args.forward_tolerance)
     np.testing.assert_allclose(h.detach().numpy(), h_torch.detach().numpy(), atol=args.forward_tolerance)
@@ -82,10 +81,10 @@ if __name__ == "__main__":
     out_torch.sum().backward()
 
     for i, cell in enumerate(rnn.rnn_cells):
-        np.testing.assert_allclose(cell.WI.grad.detach().numpy().T, getattr(torch_rnn, "weight_ih_l" + str(i)).grad.detach().numpy(), atol=args.backward_tolerance)
-        np.testing.assert_allclose(cell.WH.grad.detach().numpy().T, getattr(torch_rnn, "weight_hh_l" + str(i)).grad.detach().numpy(), atol=args.backward_tolerance)
-        np.testing.assert_allclose(cell.BI.grad.detach().numpy().T, getattr(torch_rnn, "bias_ih_l" + str(i)).grad.detach().numpy(), atol=args.backward_tolerance)
-        np.testing.assert_allclose(cell.BH.grad.detach().numpy().T, getattr(torch_rnn, "bias_hh_l" + str(i)).grad.detach().numpy(), atol=args.backward_tolerance)
+        np.testing.assert_allclose(cell.W_i.grad.detach().numpy().T, getattr(rnn_torch, "weight_ih_l" + str(i)).grad.detach().numpy(), atol=args.backward_tolerance)
+        np.testing.assert_allclose(cell.W_h.grad.detach().numpy().T, getattr(rnn_torch, "weight_hh_l" + str(i)).grad.detach().numpy(), atol=args.backward_tolerance)
+        np.testing.assert_allclose(cell.b_i.grad.detach().numpy().T, getattr(rnn_torch, "bias_ih_l" + str(i)).grad.detach().numpy(), atol=args.backward_tolerance)
+        np.testing.assert_allclose(cell.b_h.grad.detach().numpy().T, getattr(rnn_torch, "bias_hh_l" + str(i)).grad.detach().numpy(), atol=args.backward_tolerance)
 
     print(f"Backwards pass match with {args.backward_tolerance=}")
     
