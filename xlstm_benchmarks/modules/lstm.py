@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch import Tensor
+from torch import Tensor as T
 
 
 class LSTMCell(nn.Module):
@@ -18,15 +18,12 @@ class LSTMCell(nn.Module):
         nn.init.xavier_normal_(self.W_i), nn.init.zeros_(self.b_i)
         nn.init.xavier_normal_(self.W_h), nn.init.zeros_(self.b_h)
 
-    def forward(self, x:Tensor, h:Tensor, c:Tensor)->tuple[Tensor, Tensor]:
-        i_i, i_f, i_g, i_o = torch.chunk(x @ self.W_i + self.b_i, 4, dim=-1)
-        h_i, h_f, h_g, h_o = torch.chunk(h @ self.W_h + self.b_h, 4, dim=-1)
-        # input gate, forget gate, output gate
-        i, f, o = torch.sigmoid(i_i + h_i), torch.sigmoid(i_f + h_f), torch.sigmoid(i_o + h_o)
-        # input node / input modulation
-        c_tilde = torch.tanh(i_g + h_g)
-        # update memory cell
-        c = f * c + i * c_tilde # forget old information (forget * cell_state), add new information (input * input_modulation)
+    def forward(self, x:T, h:T, c:T)->tuple[T, T]:
+        i_tilde, f_tilde, z_tilde, o_tilde = (x @ self.W_i + self.b_i + h @ self.W_h + self.b_h).chunk(4, dim=-1)
+        # input gate, forget gate, input node / input modulation, output gate
+        i, f, z, o = torch.sigmoid(i_tilde), torch.sigmoid(f_tilde), torch.tanh(z_tilde), torch.sigmoid(o_tilde)
+        # forget old information (forget_gate * cell_state), add new information (input_gate * input_modulation)
+        c = f * c + i * z 
         # update hidden state
         h = o * torch.tanh(c)
         return h, c
@@ -38,7 +35,7 @@ class LSTM(nn.Module):
 
         self.lstm_cells = nn.ModuleList([LSTMCell(input_size if i==0 else hidden_size, hidden_size) for i in range(n_layers)])
 
-    def forward(self, x:Tensor, h_0:Tensor=None, c_0:Tensor=None)->tuple[Tensor, tuple[Tensor]]:
+    def forward(self, x:T, h_0:T=None, c_0:T=None)->tuple[T, tuple[T]]:
         B, L, _ = x.shape
 
         if h_0 is None: h_0 = torch.zeros(self.n_layers, B, self.hidden_size, device=x.device)

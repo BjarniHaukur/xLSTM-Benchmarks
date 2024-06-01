@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch import Tensor
+from torch import Tensor as T
 
 class RNNCell(nn.Module):
     def __init__(self, input_size:int, hidden_size:int):
@@ -17,7 +17,7 @@ class RNNCell(nn.Module):
         nn.init.xavier_normal_(self.W_i), nn.init.zeros_(self.b_i)
         nn.init.xavier_normal_(self.W_h), nn.init.zeros_(self.b_h)
 
-    def forward(self, x:Tensor, h:Tensor)->Tensor:
+    def forward(self, x:T, h:T)->T:
         return torch.tanh(x @ self.W_i + self.b_i + h @ self.W_h + self.b_h)
 
 
@@ -28,7 +28,7 @@ class RNN(nn.Module):
 
         self.rnn_cells = nn.ModuleList([RNNCell(input_size if i==0 else hidden_size, hidden_size) for i in range(n_layers)])
 
-    def forward(self, x:Tensor, h_0:Tensor=None)->tuple[Tensor, Tensor]:
+    def forward(self, x:T, h_0:T=None)->tuple[T, T]:
         B, L, _ = x.shape # batch, length, dimensionality
 
         if h_0 is None: h_0 = torch.zeros(self.n_layers, B, self.hidden_size, device=x.device)

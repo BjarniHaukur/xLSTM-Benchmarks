@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch import Tensor
+from torch import Tensor as T
 
 
 class GRUCell(nn.Module):
@@ -18,9 +18,9 @@ class GRUCell(nn.Module):
         nn.init.xavier_normal_(self.W_i), nn.init.zeros_(self.b_i)
         nn.init.xavier_normal_(self.W_h), nn.init.zeros_(self.b_h)
 
-    def forward(self, x:Tensor, h:Tensor)->Tensor:
-        i_r, i_z, i_n = torch.chunk(x @ self.W_i + self.b_i, 3, dim=-1)
-        h_r, h_z, h_n = torch.chunk(h @ self.W_h + self.b_h, 3, dim=-1)
+    def forward(self, x:T, h:T)->T:
+        i_r, i_z, i_n = (x @ self.W_i + self.b_i).chunk(3, dim=-1)
+        h_r, h_z, h_n = (h @ self.W_h + self.b_h).chunk(3, dim=-1)
         # reset gate, update gate
         r, z = torch.sigmoid(i_r + h_r), torch.sigmoid(i_z + h_z)
         # candidate hidden state
@@ -35,7 +35,7 @@ class GRU(nn.Module):
 
         self.gru_cells = nn.ModuleList([GRUCell(input_size if i==0 else hidden_size, hidden_size) for i in range(n_layers)])
 
-    def forward(self, x:Tensor, h_0:Tensor=None)->tuple[Tensor, Tensor]:
+    def forward(self, x:T, h_0:T=None)->tuple[T, T]:
         B, L, _ = x.shape
 
         if h_0 is None: h_0 = torch.zeros(self.n_layers, B, self.hidden_size, device=x.device)
