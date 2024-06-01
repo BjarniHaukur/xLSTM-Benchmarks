@@ -33,7 +33,7 @@ class RNN(nn.Module):
 
         if h_0 is None: h_0 = torch.zeros(self.n_layers, B, self.hidden_size, device=x.device)
 
-        h_t = [h.clone() for h in h_0]
+        h_t = [h for h in h_0] # avoid in-place operations
 
         output = [] 
         for t in range(L):
